@@ -196,7 +196,7 @@ on:
         default: true
 
       customization:
-        description: '自訂預設配置 JSON (Custom Default Configuration Wi-Fi/Passwords/IP)'
+        description: "自訂預設配置 JSON"
         required: true
         type: string
         default: '{"lanip":"192.168.1.1","signaccount":"admin","signpassword":"admin","wifi2gssid":"Thanh2012_2.4G","wifi2gpsk":"thanh04012012"}'
@@ -215,7 +215,6 @@ jobs:
       - name: Checkout Workflow
         uses: actions/checkout@v4
 
-      # 0. 環境初檢
       - name: Debug - Initial Environment Check
         run: |
           echo "::group::System Info"
@@ -224,7 +223,6 @@ jobs:
           df -h
           echo "::endgroup::"
 
-      # 1. 安裝依賴
       - name: Install Dependencies & Fix Timezone
         run: |
           echo "::group::Apt Update & Install"
@@ -248,7 +246,6 @@ jobs:
           echo "BUILD_TIME=$(date +%Y%m%d-%H%M)" >> $GITHUB_ENV
           echo "::endgroup::"
 
-      # 2. 設定變數
       - name: Get variables
         run: |
           echo "::group::Variable Loading"
@@ -271,7 +268,6 @@ jobs:
           done
           echo "::endgroup::"
 
-      # 3. 下載源碼
       - name: Download sources and toolchain
         run: |
           echo "::group::Git Clone"
@@ -283,7 +279,6 @@ jobs:
           wget -qO- "$PADAVAN_TOOLCHAIN_URL" | tar -C padavan-ng --zstd -xf -
           echo "::endgroup::"
 
-      # 4. 生成 Config
       - name: Generate build.config & Apply Nano
         run: |
           TNAME="${{ inputs.target_select }}"
@@ -308,27 +303,20 @@ jobs:
           FINAL_CONFIG="build.config"
           echo "::endgroup::"
           
-          # === 極限瘦身邏輯 (Ultimate Nano - TC/Cake Ready) ===
           if [ "${{ inputs.nanoversion }}" == "true" ]; then
             echo "::group::Nano Optimization - Final Execution"
-         
-            # 1. [體積優化] 強制開啟 Size Optimization
             sed -i "s/#CONFIG_CC_OPTIMIZE_FOR_SIZE=y/CONFIG_CC_OPTIMIZE_FOR_SIZE=y/g" "$FINAL_CONFIG"
          
-            # 2. [基礎切除] 停用 USB, 檔案系統, Swap, 媒體驅動
             for feat in USB ANTFS FAT EXFAT EXT2 EXT3 EXT4 XFS HFS FUSE SWAP BACKPORTED; do
               sed -i "s/CONFIG_FIRMWARE_ENABLE_${feat}=y/CONFIG_FIRMWARE_ENABLE_${feat}=n/gi" "$FINAL_CONFIG"
             done
          
-            # 3. [語言包精準控制] 
             sed -i "s/CONFIG_FIRMWARE_INCLUDE_LANG_EN=n/CONFIG_FIRMWARE_INCLUDE_LANG_EN=y/g" "$FINAL_CONFIG"
             sed -i "s/#CONFIG_FIRMWARE_INCLUDE_LANG_CN=y/CONFIG_FIRMWARE_INCLUDE_LANG_CN=y/g" "$FINAL_CONFIG"
             sed -i "s/CONFIG_FIRMWARE_INCLUDE_LANG_CN=n/CONFIG_FIRMWARE_INCLUDE_LANG_CN=y/g" "$FINAL_CONFIG"
             sed -i "s/CONFIG_FIRMWARE_INCLUDE_LANG_RU=y/CONFIG_FIRMWARE_INCLUDE_LANG_RU=n/g" "$FINAL_CONFIG"
             sed -i "s/CONFIG_FIRMWARE_INCLUDE_LANG_UK=y/CONFIG_FIRMWARE_INCLUDE_LANG_UK=n/g" "$FINAL_CONFIG"
          
-            # 4. [地毯式移除 - 究極防漏版]
-            echo "::group::Absolute Disable Modules"
             modules=(
               CIFS NTFS_3G LPRD U2EC USBIP HDPARM PARTED SMBD WINS SMBD_SYSLOG TESTPARM 
               FTPD FTPD_SSL NFSD NFSC
@@ -366,7 +354,6 @@ jobs:
           done
           echo "::endgroup::"
 
-      # 5. 應用自定義設定 (JSON)
       - name: Apply Custom Settings
         run: |
           echo "::group::JSON Parsing & Export"
@@ -391,7 +378,6 @@ jobs:
           fi
           echo "::endgroup::"
 
-      # 6. 安裝 Themes
       - name: Install themes
         run: |
           echo "::group::Themes Installation"
@@ -405,7 +391,6 @@ jobs:
           fi
           echo "::endgroup::"
 
-      # 7. 修正 mkimage
       - name: Fix mkimage
         run: |
           MKIMAGE_FILE="padavan-ng/trunk/tools/mkimage/mkimage.c"
@@ -414,9 +399,6 @@ jobs:
             sed -i 's/"%d\.%d%c"/"%hhd.%hhd%c"/g' "$MKIMAGE_FILE"
           fi
 
-      # =======================================================
-      # 7.4. [核心升級] BusyBox 1.37.0 V44: Integrated Masterpiece
-      # =======================================================
       - name: 🔥 Sync & Evolve BusyBox (V44:Integrated)
         run: |
           set -x
@@ -626,7 +608,6 @@ jobs:
               local LIST_NAME=$2 
               local FAILURES=()
               if [ ! -f "$FILE" ]; then return 1; fi
-              
               for ENTRY in "${CHECKS_SET[@]}"; do
                   KEY=${ENTRY%% *}
                   VAL=${ENTRY#* }
@@ -634,13 +615,11 @@ jobs:
                       FAILURES+=("$ENTRY")
                   fi
               done
-              
               for KEY in "${CHECKS_UNSET[@]}"; do
                   if grep -q "^${KEY}=" "$FILE"; then
                       FAILURES+=("$KEY UNSET")
                   fi
               done
-              
               if [ ${#FAILURES[@]} -gt 0 ]; then
                   eval "$LIST_NAME=(\"\${FAILURES[@]}\")"
                   return 1
@@ -665,7 +644,6 @@ jobs:
               done
           }
 
-          echo "🔧 [PHASE 2] Config Evolution"
           if [ -f "$SYNC_TARGET_3" ]; then
               cp -f "$SYNC_TARGET_3" .config
           fi
@@ -704,7 +682,6 @@ jobs:
           cp -f .config "$SYNC_TARGET_2"
           cp -f .config "$SYNC_TARGET_3"
 
-          echo "💉 [PHASE 5] Code & Build Verify"
           cd "../../rc"
           RC_FILE="services.c" 
           if [ -f "$RC_FILE" ]; then
@@ -713,7 +690,6 @@ jobs:
           fi
 
           cd ../.. 
-          echo "🧹 [PHASE 6] Build System Cleanup & Verify"
           grep -rl "busybox-1.24.x" user/ | xargs -r sed -i "s/busybox-1.24.x/busybox-1.37.0/g" || true
           grep -rl "busybox-1.24.2" user/ | xargs -r sed -i "s/busybox-1.24.2/busybox-1.37.0/g" || true
           
@@ -723,11 +699,9 @@ jobs:
              fi
           done
 
-          echo "🛡️ [PHASE 7] Applying Security Patches"
           cd user/busybox
           if [ -d "busybox-1.37.0" ]; then cd "busybox-1.37.0"; fi
           
-          # Patch CVE-2025-46394 an toàn
           if [ -f "archival/libarchive/header_list.c" ]; then
               sed -i 's/puts(file_header->name);/puts(printable_string(file_header->name));/' archival/libarchive/header_list.c
           fi
@@ -739,15 +713,12 @@ jobs:
           set +x
           echo "::endgroup::"
       
-      # =======================================================
-      # 7.5. [全局修復] 升級 iptables 1.8.11 + 修復所有依賴包路徑 + 套用 Upstream Patches
-      # =======================================================
       - name: 🔥 Auto Upgrade iptables 1.8.11 & Patch
         run: |
           set +e
           set -x
           
-          echo "::group::Iptables Upgrade & Patching (1.8.11 Collector Mode)"
+          echo "::group::Iptables Upgrade & Patching"
           NEW_VER="iptables-1.8.11"
           
           IPT_MAKEFILE=$(find padavan-ng/trunk/user/iptables -name Makefile | head -n 1)
@@ -775,35 +746,35 @@ jobs:
           PATCH_DIR="$IPT_DIR/patches_archive"
           mkdir -p "$PATCH_DIR"
 
-          cat << 'EOL' > "$IPT_DIR/patch_list.txt"
-2024-11-08|configure: Bump version for 1.8.11 release|https://git.netfilter.org/iptables/patch/?id=0506bea1dcc8f12d94e7c32bf2fb04abb3fdd269
-2024-11-12|ip[6]tables-translate: fix test failures when WESP is defined|https://git.netfilter.org/iptables/patch/?id=e6e232d0ae252b0b86278455b18d9475b95db8f0
-2024-11-19|nft: fix interface comparisons in -C commands|https://git.netfilter.org/iptables/patch/?id=40406dbfaefbc204134452b2747bae4f6a122848
-2024-11-19|nft: Drop interface mask leftovers from post_parse callbacks|https://git.netfilter.org/iptables/patch/?id=b3f3e256c263b9a1db49732696aba0dde084ef5e
-2025-01-28|configure: Avoid addition assignment operators|https://git.netfilter.org/iptables/patch/?id=6310639f697d4a570286960c470a6ec8c324be89
-2025-04-10|nft: Make add_log() static|https://git.netfilter.org/iptables/patch/?id=17fb168f007eb4200a1d3325898cf5256a029d81
-2025-04-10|nft: ruleparse: Introduce nft_parse_rule_expr()|https://git.netfilter.org/iptables/patch/?id=d84b1647514f3121bd4a6adfca9a977751c39bbc
-2025-04-10|nft: __add_{match,target}() can't fail|https://git.netfilter.org/iptables/patch/?id=2db8bf2fbf080f6a054b658df65c468bfa0db68d
-2025-04-10|nft: Introduce UDATA_TYPE_COMPAT_EXT|https://git.netfilter.org/iptables/patch/?id=f6f0f4f55794a5f1add6f728f80f29f12f36ecd5
-2025-04-10|nft-ruleparse: Fallback to compat expressions in userdata|https://git.netfilter.org/iptables/patch/?id=ff5f6a208efccd4e2bd8d4fdaf5d284ce54ff69e
-2025-04-10|nft: Pass nft_handle into add_{action,match}()|https://git.netfilter.org/iptables/patch/?id=739d9bd57ad26bd52bed569264daa97b5943e08d
-2025-04-10|nft: Embed compat extensions in rule userdata|https://git.netfilter.org/iptables/patch/?id=7746fa0b1619e1bd8465c9a98bdbead628ed428a
-2025-04-10|tests: iptables-test: Add nft-compat variant|https://git.netfilter.org/iptables/patch/?id=fdb541cddad0681ea3ab1fca8a3949dcf49fb194
-2025-04-23|extensions: icmp: Support info-request/-reply type names|https://git.netfilter.org/iptables/patch/?id=1e6a2812971a268428b04b03520cd68cb61d76e3
-2025-04-23|xshared: Accept an option if any given command allows it|https://git.netfilter.org/iptables/patch/?id=192c3a6bc18f206895ec5e38812d648ccfe7e281
-2025-07-04|extensions: sctp: Translate bare -m sctp match|https://git.netfilter.org/iptables/patch/?id=12e6b5ed65fd91ea413a2e45201289c3d01c4e29
-2025-07-17|extensions: libebt_redirect: prevent translation|https://git.netfilter.org/iptables/patch/?id=d33c6ad308cf7b9f627aeed48a5163c0374b5035
-2025-07-22|libxtables: Promote xtopt_esize_by_type() as xtopt_psize getter|https://git.netfilter.org/iptables/patch/?id=786b75f7c9b9feaa294da097c2e9727747162c79
-2025-07-22|Revert libxtables: Promote xtopt_esize_by_type() as xtopt_psize getter|https://git.netfilter.org/iptables/patch/?id=f66687b6cb5fd0bb36107c30339aa7f4ff75e98e
-2025-07-22|xtables-monitor: Print -X command for base chains, too|https://git.netfilter.org/iptables/patch/?id=8cb0c13b7777e72ca6f4265845dc99eff7cdf679
-2025-08-21|extensions: man: Add a note about route_localnet sysctl|https://git.netfilter.org/iptables/patch/?id=102e9607c63266c7f3413f8dcae51d9476e396e4
-2025-08-25|man: iptables-restore.8: document flush behaviour for user-defined chains|https://git.netfilter.org/iptables/patch/?id=c3d5053db05f99bd72219aebeefc7fb0195ac041
-2025-11-27|nft: Support replacing a rule added in the same batch|https://git.netfilter.org/iptables/patch/?id=78d7a5f8619f3965ec2da13003a876c808c40cfb
-EOL
+          # Tải danh sách patch trực tiếp qua URL an toàn, không dùng khối Here-Doc
+          patch_urls=(
+            "https://git.netfilter.org/iptables/patch/?id=0506bea1dcc8f12d94e7c32bf2fb04abb3fdd269"
+            "https://git.netfilter.org/iptables/patch/?id=e6e232d0ae252b0b86278455b18d9475b95db8f0"
+            "https://git.netfilter.org/iptables/patch/?id=40406dbfaefbc204134452b2747bae4f6a122848"
+            "https://git.netfilter.org/iptables/patch/?id=b3f3e256c263b9a1db49732696aba0dde084ef5e"
+            "https://git.netfilter.org/iptables/patch/?id=6310639f697d4a570286960c470a6ec8c324be89"
+            "https://git.netfilter.org/iptables/patch/?id=17fb168f007eb4200a1d3325898cf5256a029d81"
+            "https://git.netfilter.org/iptables/patch/?id=d84b1647514f3121bd4a6adfca9a977751c39bbc"
+            "https://git.netfilter.org/iptables/patch/?id=2db8bf2fbf080f6a054b658df65c468bfa0db68d"
+            "https://git.netfilter.org/iptables/patch/?id=f6f0f4f55794a5f1add6f728f80f29f12f36ecd5"
+            "https://git.netfilter.org/iptables/patch/?id=ff5f6a208efccd4e2bd8d4fdaf5d284ce54ff69e"
+            "https://git.netfilter.org/iptables/patch/?id=739d9bd57ad26bd52bed569264daa97b5943e08d"
+            "https://git.netfilter.org/iptables/patch/?id=7746fa0b1619e1bd8465c9a98bdbead628ed428a"
+            "https://git.netfilter.org/iptables/patch/?id=fdb541cddad0681ea3ab1fca8a3949dcf49fb194"
+            "https://git.netfilter.org/iptables/patch/?id=1e6a2812971a268428b04b03520cd68cb61d76e3"
+            "https://git.netfilter.org/iptables/patch/?id=192c3a6bc18f206895ec5e38812d648ccfe7e281"
+            "https://git.netfilter.org/iptables/patch/?id=12e6b5ed65fd91ea413a2e45201289c3d01c4e29"
+            "https://git.netfilter.org/iptables/patch/?id=d33c6ad308cf7b9f627aeed48a5163c0374b5035"
+            "https://git.netfilter.org/iptables/patch/?id=786b75f7c9b9feaa294da097c2e9727747162c79"
+            "https://git.netfilter.org/iptables/patch/?id=f66687b6cb5fd0bb36107c30339aa7f4ff75e98e"
+            "https://git.netfilter.org/iptables/patch/?id=8cb0c13b7777e72ca6f4265845dc99eff7cdf679"
+            "https://git.netfilter.org/iptables/patch/?id=102e9607c63266c7f3413f8dcae51d9476e396e4"
+            "https://git.netfilter.org/iptables/patch/?id=c3d5053db05f99bd72219aebeefc7fb0195ac041"
+            "https://git.netfilter.org/iptables/patch/?id=78d7a5f8619f3965ec2da13003a876c808c40cfb"
+          )
 
           count=0
-          while IFS='|' read -r p_date p_name p_url; do
-              [ -z "$p_date" ] && continue
+          for p_url in "${patch_urls[@]}"; do
               count=$((count+1))
               count_str=$(printf "%02d" $count)
               patch_file="$PATCH_DIR/${count_str}.patch"
@@ -811,7 +782,7 @@ EOL
               if [ -s "$patch_file" ] && [ -d "$IPT_ROOT" ]; then
                   patch -d "$IPT_ROOT" -t -N -l -F 10 -p1 < "$patch_file" 2>/dev/null || true
               fi
-          done < "$IPT_DIR/patch_list.txt"
+          done
 
           if [ -f "$IPT_ROOT/libxtables/xtables.c" ]; then
               sed -i 's/fprintf(stderr,[[:space:]]*"Warning: Extension %s is not supported/\/\/ &/' "$IPT_ROOT/libxtables/xtables.c"
@@ -822,7 +793,6 @@ EOL
           done
           echo "::endgroup::"
 
-      # 7.6 [網路工具] 智慧編譯 新增 Arptables
       - name: 🔥 Network Tools (Smart Compile Arptables)
         run: |
           echo "::group::Smart Compile Network Tools"
@@ -843,24 +813,13 @@ EOL
             ARP_SRC_NAME=$(ls -d arptables-0*/ | head -n 1 | sed 's/\///')
             chmod -R u+w "$ARP_SRC_NAME"
           
-            cat << EOF > Makefile
-SRC_NAME=$ARP_SRC_NAME
-
-all:
-	\$(MAKE) -C \$(SRC_NAME) \
-		CC="\$(CC)" \
-		AR="\$(AR)" \
-		KERNEL_DIR=\$(KERNEL_HEADERS_PATH) \
-		COPT_FLAGS="-Os -static" \
-		LDFLAGS="-static" \
-		arptables-legacy
-
-romfs:
-	\$(ROMFSINST) \$(SRC_NAME)/arptables-legacy /bin/arptables
-
-clean:
-	\$(MAKE) -C \$(SRC_NAME) clean
-EOF
+            echo "SRC_NAME=$ARP_SRC_NAME" > Makefile
+            echo "all:" >> Makefile
+            echo -e "\t\$(MAKE) -C \$(SRC_NAME) CC=\"\$(CC)\" AR=\"\$(AR)\" KERNEL_DIR=\$(KERNEL_HEADERS_PATH) COPT_FLAGS=\"-Os -static\" LDFLAGS=\"-static\" arptables-legacy" >> Makefile
+            echo "romfs:" >> Makefile
+            echo -e "\t\$(ROMFSINST) \$(SRC_NAME)/arptables-legacy /bin/arptables" >> Makefile
+            echo "clean:" >> Makefile
+            echo -e "\t\$(MAKE) -C \$(SRC_NAME) clean" >> Makefile
           
             cd "$BASE_DIR" || exit 1
             if ! grep -q "dir_y += arptables" Makefile; then
@@ -886,7 +845,6 @@ EOF
           fi
           echo "::endgroup::"
 
-      # 7.7 [驅動魔改] 修復 MT7628 無線驅動斷線與快速重連 (適配 WR841N-V13 SoC)
       - name: 🔥 Patch Wi-Fi Driver (Anti-Disconnect & Fast Reconnect)
         run: |
           echo "::group::Applying Universal Wi-Fi Driver Patch"
@@ -964,7 +922,6 @@ EOF
           fi
           echo "::endgroup::"
       
-      # 8. 開始編譯
       - name: Build firmware
         run: |
           echo "::group::Build Process"
@@ -978,7 +935,6 @@ EOF
           ./build_firmware.sh 2>&1 | tee build.log
           echo "::endgroup::"
 
-      # 9. 智慧打包與產物偵測
       - name: Smart-Pack & Debug Collection
         run: |
           echo "::group::Smart Packing"
@@ -1063,7 +1019,6 @@ EOF
           name: padavan_${{ env.CONFIG_VENDOR }}_${{ env.CONFIG_FIRMWARE_PRODUCT_ID }}_${{ env.BUILD_TIMESTAMP }}
           path: ${{ env.ZIP_FILE_PATH }}
 
-      # 10. 發布 Release
       - name: Set Release Tag
         if: github.event_name == 'workflow_dispatch'
         run: |
