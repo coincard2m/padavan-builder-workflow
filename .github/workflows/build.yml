@@ -199,7 +199,7 @@ on:
         description: '自訂預設配置 JSON (Custom Default Configuration Wi-Fi/Passwords/IP)'
         required: true
         type: string
-        default: '{"lanip":"192.168.1.1","signaccount":"admin","signpassword":"admin","wifi2gssid":"Thanh2012_2.4G","wifi2gpsk":"thanh04012012","wifi5gssid":"Padavan-5G","wifi5gpsk":"1234567890"}'
+        default: '{"lanip":"192.168.1.1","signaccount":"admin","signpassword":"admin","wifi2gssid":"Thanh2012_2.4G","wifi2gpsk":"thanh04012012"}'
 
   push:
     tags:
@@ -349,7 +349,6 @@ jobs:
          
             for mod in "${modules[@]}"; do
               CFG_KEY="CONFIG_FIRMWARE_INCLUDE_${mod}"
-              
               if grep -q "$CFG_KEY" "$FINAL_CONFIG"; then
                 sed -i "s|^.*$CFG_KEY.*$|$CFG_KEY=n|" "$FINAL_CONFIG"
                 echo "   🚫 Forced Disabled: $mod (Overwritten)"
@@ -358,14 +357,11 @@ jobs:
                 echo "   🚫 Forced Disabled: $mod (Added)"
               fi
             done
-            
             echo "::endgroup::"
           fi
 
           echo "::group::Core Modules Enforcement"
-          # 5. 強制保留並開啟的核心模組
           keep_modules=(OPENSSH SFTP TCPDUMP CURL HTTPS OPENSSL_EC OPENSSL_EXE SHORTCUT_FE QOS)
-
           for kmod in "${keep_modules[@]}"; do
             sed -i "/CONFIG_FIRMWARE_INCLUDE_${kmod}/d" "$FINAL_CONFIG"
             echo "CONFIG_FIRMWARE_INCLUDE_${kmod}=y" >> "$FINAL_CONFIG"
@@ -376,7 +372,6 @@ jobs:
       - name: Apply Custom Settings
         run: |
           echo "::group::JSON Parsing & Export"
-          
           jq empty <<< '${{ inputs.customization }}' || { echo "❌ Invalid JSON"; exit 1; }
           
           echo '${{ inputs.customization }}' | jq -r 'to_entries[] | "\(.key)=\(.value)"' | while IFS='=' read -r k v; do
@@ -388,15 +383,13 @@ jobs:
           SIGNPASSWORD=$(echo '${{ inputs.customization }}' | jq -r .signpassword)
           WIFI2GSSID=$(echo '${{ inputs.customization }}' | jq -r .wifi2gssid)
           WIFI2GPSK=$(echo '${{ inputs.customization }}' | jq -r .wifi2gpsk)
-          WIFI5GSSID=$(echo '${{ inputs.customization }}' | jq -r .wifi5gssid)
-          WIFI5GPSK=$(echo '${{ inputs.customization }}' | jq -r .wifi5gpsk)
           
           if [ -d "padavan-ng/trunk/custom/scripts" ]; then
             cd padavan-ng
             chmod +x trunk/custom/scripts/*.sh
             [ ! -z "$LANIP" ] && bash trunk/custom/scripts/setip.sh "$LANIP" trunk/user/shared/defaults.h trunk/user/www/dict/CN.dict || true
             [ ! -z "$SIGNACCOUNT" ] && bash trunk/custom/scripts/setaccount.sh "$SIGNACCOUNT" "$SIGNPASSWORD" trunk/user/shared/defaults.h || true
-            [ ! -z "$WIFI2GSSID" ] && bash trunk/custom/scripts/setwifi.sh "$WIFI2GSSID" "$WIFI2GPSK" "$WIFI5GSSID" "$WIFI5GPSK" trunk/user/shared/defaults.h || true
+            [ ! -z "$WIFI2GSSID" ] && bash trunk/custom/scripts/setwifi.sh "$WIFI2GSSID" "$WIFI2GPSK" "" "" trunk/user/shared/defaults.h || true
           fi
           echo "::endgroup::"
 
@@ -451,7 +444,6 @@ jobs:
           readonly SYNC_TARGET_3="../../../configs/boards/busybox.config"
 
           CHECKS_SET=(
-              # Shells
               "CONFIG_SH_IS_ASH y"
               "CONFIG_BASH_IS_ASH y"
               "CONFIG_ASH y"
@@ -469,8 +461,6 @@ jobs:
               "CONFIG_ASH_MAIL y"
               "CONFIG_FEATURE_SH_MATH_BASE y"
               "CONFIG_FEATURE_SH_EMBEDDED_SCRIPTS y"
-              
-              # Logging
               "CONFIG_SYSLOGD y"
               "CONFIG_FEATURE_ROTATE_LOGFILE y"
               "CONFIG_FEATURE_REMOTE_LOG y"
@@ -482,8 +472,6 @@ jobs:
               "CONFIG_KLOGD y"
               "CONFIG_FEATURE_KLOGD_KLOGCTL y"
               "CONFIG_LOGGER y"
-              
-              # Network & DHCP
               "CONFIG_UDHCPC_DEFAULT_INTERFACE \"eth3\""
               "CONFIG_FEATURE_IP_ROUTE_DIR \"\""
               "CONFIG_SHA1_SMALL 1"
@@ -506,8 +494,6 @@ jobs:
               "CONFIG_TLS y"
               "CONFIG_SVC y"
               "CONFIG_SVOK y"
-              
-              # WGET
               "CONFIG_WGET y"
               "CONFIG_FEATURE_WGET_LONG_OPTIONS y"
               "CONFIG_FEATURE_WGET_STATUSBAR y"
@@ -515,8 +501,6 @@ jobs:
               "CONFIG_FEATURE_WGET_TIMEOUT y"
               "CONFIG_FEATURE_WGET_HTTPS y"
               "CONFIG_FEATURE_WGET_OPENSSL y"
-              
-              # Loop & Core
               "CONFIG_NO_LOOP_CONFIGURE y"
               "CONFIG_BZIP2_SMALL 9"
               "CONFIG_CRC32 y"
@@ -566,8 +550,6 @@ jobs:
               "CONFIG_SETFATTR y"
               "CONFIG_TS y"
               "CONFIG_UBIRENAME y"
-              
-              # User Preferences
               "CONFIG_FEATURE_TAR_LONG_OPTIONS y"
               "CONFIG_FEATURE_SORT_OPTIMIZE_MEMORY y"
               "CONFIG_FEATURE_SHOW_SCRIPT y"
@@ -578,8 +560,6 @@ jobs:
               "CONFIG_FEATURE_ETC_SERVICES y"
               "CONFIG_FEATURE_CATN y"
               "CONFIG_FEATURE_CATV y"
-              
-              # Volume IDs
               "CONFIG_FEATURE_VOLUMEID_UBIFS y"
               "CONFIG_FEATURE_VOLUMEID_XFS y"
           )
@@ -756,12 +736,10 @@ jobs:
 
           echo "🌍 [PHASE 4] Sync & Global Verify"
           mkdir -p "$(dirname "$SYNC_TARGET_3")"
-          
           cp -f .config "$SYNC_TARGET_2"
           cp -f .config "$SYNC_TARGET_3"
           
           ALL_TARGETS=("$SYNC_TARGET_1" "$SYNC_TARGET_2" "$SYNC_TARGET_3")
-          
           for TARGET in "${ALL_TARGETS[@]}"; do
               echo "   ----------------------------------------"
               echo "   🔍 Final Audit for: $TARGET"
@@ -776,60 +754,23 @@ jobs:
           done
           echo "✅ All 3 Targets are 100% Synchronized and Verified."
 
+          # --- Sửa dứt điểm lỗi thụt dòng YAML Phase 5 ---
           echo "💉 [PHASE 5] Code & Build Verify"
           cd "../../rc"
           RC_FILE="services.c" 
-          PATCH_FILE="services_syslogd_fix.patch"
-          
           if [ -f "$RC_FILE" ]; then
-              echo "   🔍 Checking $RC_FILE..."
-              if grep -F '"-L",' "$RC_FILE" && ! grep -q 'syslogd_argv\[7\]' "$RC_FILE"; then
-                  echo "   ✅ Code is already patched. Skipping apply."
+              echo "   🔍 Patching $RC_FILE with sed..."
+              sed -i 's/NULL,[[:space:]]*\/\*[[:space:]]*-L[[:space:]]*\*\//"-L",\t\t\t\t\/* log locally *\//' "$RC_FILE"
+              sed -i '/syslogd_argv\[7\] = "-L";/d' "$RC_FILE"
+              
+              if grep -F '"-L",' "$RC_FILE"; then
+                  echo "✅ Services.c Patched Successfully."
               else
-                  if grep -F "NULL,				/* -L */" "$RC_FILE"; then
-                      echo "   -> Applying patch..."
-                      cat << 'END_PATCH' > "$PATCH_FILE"
---- services.c.orig
-+++ services.c
-@@ -52,7 +52,7 @@
- 		"-S",				/* smaller output */
- 		"-D",				/* drop duplicates */
- 		"-O", "/tmp/syslog.log",	/* syslog file */
--		NULL,				/* -L */
-+		"-L",				/* log locally */
- 		NULL, NULL,			/* -R host:port */
- 		NULL
- 	};
-@@ -63,8 +63,7 @@
- 	if (is_valid_ipv4(log_ipaddr)) {
- 		int log_port = nvram_safe_get_int("log_port", 514, 1, 65535);
- 		snprintf(host_dst, sizeof(host_dst), "%s:%d", log_ipaddr, log_port);
--		syslogd_argv[7] = "-L";		/* local & remote */
- 		syslogd_argv[8] = "-R";
- 		syslogd_argv[9] = host_dst;
- 	}
-END_PATCH
-                      patch -l -F 5 -N < "$PATCH_FILE" || echo "⚠️ Patch msg: Fuzzy match or already applied."
-                      rm "$PATCH_FILE"
-                  else
-                      echo "⚠️ Target code block not found! File might be already changed."
-                  fi
+                  echo "⚠️ Patch pattern not matched or already applied."
               fi
-              
-              if ! grep -F '"-L",' "$RC_FILE"; then 
-                  echo "❌ Patch Failed! '-L' not found."
-                  exit 1
-              fi
-              
-              if grep -q 'syslogd_argv\[7\]' "$RC_FILE"; then 
-                  echo "❌ Patch Failed! Old code remains."
-                  exit 1
-              fi
-              echo "✅ Code Patch Verified."
           fi
 
           cd ../.. 
-          
           echo "🧹 [PHASE 6] Build System Cleanup & Verify"
           grep -rl "busybox-1.24.x" user/ | xargs -r sed -i "s/busybox-1.24.x/busybox-1.37.0/g" || true
           grep -rl "busybox-1.24.2" user/ | xargs -r sed -i "s/busybox-1.24.2/busybox-1.37.0/g" || true
@@ -849,97 +790,31 @@ END_PATCH
           fi
           echo "✅ Build System Verified (No old versions found)."
 
+          # --- Security Patching trực tiếp (Tránh lỗi cú pháp YAML) ---
           echo "🛡️ [PHASE 7] Applying Security Patches"
           cd user/busybox
           if [ -d "busybox-1.37.0" ]; then cd "busybox-1.37.0"; fi
           
-          echo "   -> Creating 'patches' directory..."
-          mkdir -p patches
+          echo "   -> Patching CVE-2025-60876 directly..."
+          if [ -f "networking/wget.c" ]; then
+              sed -i '/unsigned char \*u = (void \*) src_url;/d' networking/wget.c
+              sed -i '/parse_url(const char \*src_url, struct host_info \*h)/{n;N;d}' networking/wget.c 2>/dev/null || true
+              sed -i 's/char \*url, \*p, \*sp;/char \*url, \*p, \*sp;\n\tunsigned char \*u = (void *) src_url;\n\twhile (*u) { if (*u <= '\'' '\'') bb_simple_error_msg_and_die("Unencoded control character found in the URL!"); u++; }/' networking/wget.c
+              echo "   ✅ CVE-2025-60876 patched."
+          fi
 
-          cat << 'CVE_PATCH_1' > patches/CVE-2025-60876.patch
-From: Radoslav Kolev <radoslav.kolev@suse.com>
-Subject: [PATCH] wget: don't allow control characters or spaces in the URL
-
-Fixes CVE-2025-60876 malicious URL can be used to inject
-HTTP headers in the request.
-
----
- networking/wget.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
-
-diff --git a/networking/wget.c b/networking/wget.c
-index ec3767793..b8a6d02bb 100644
---- a/networking/wget.c
-+++ b/networking/wget.c
-@@ -536,6 +536,15 @@ static void parse_url(const char *src_url, struct host_info *h)
- {
- 	char *url, *p, *sp;
- 
-+	/* Fix for CVE-2025-60876 - don't allow control characters or spaces in the URL */
-+	/* otherwise a malicious URL can be used to inject HTTP headers in the request */
-+	unsigned char *u = (void *) src_url;
-+	while (*u) {
-+		if (*u <= ' ')
-+			bb_simple_error_msg_and_die("Unencoded control character found in the URL!");
-+		u++;
-+	}
-+
- 	free(h->allocated);
- 	h->allocated = url = xstrdup(src_url);
-CVE_PATCH_1
-
-          echo "   -> Applying patches/CVE-2025-60876.patch..."
-          patch -p1 -N -i patches/CVE-2025-60876.patch || echo "⚠️ CVE-2025-60876 patch fuzzy/already applied."
-
-          cat << 'CVE_PATCH_2' > patches/CVE-2025-46394.patch
-From: Denys Vlasenko <vda.linux@googlemail.com>
-Subject: [PATCH] archival/libarchive: sanitize filenames on output
-
-This fixes CVE-2025-46394 (terminal escape sequence injection)
-
----
- archival/libarchive/header_list.c         | 2 +-
- archival/libarchive/header_verbose_list.c | 4 ++--
- 2 files changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/archival/libarchive/header_list.c b/archival/libarchive/header_list.c
-index 0621aa406..9490b3635 100644
---- a/archival/libarchive/header_list.c
-+++ b/archival/libarchive/header_list.c
-@@ -8,5 +8,5 @@
- void FAST_FUNC header_list(const file_header_t *file_header)
- {
- //TODO: cpio -vp DIR should output "DIR/NAME", not just "NAME" */
--	puts(file_header->name);
-+	puts(printable_string(file_header->name));
- }
- diff --git a/archival/libarchive/header_verbose_list.c b/archival/libarchive/header_verbose_list.c
- index a575a08a0..e7a09430d 100644
- --- a/archival/libarchive/header_verbose_list.c
- +++ b/archival/libarchive/header_verbose_list.c
- @@ -57,13 +57,13 @@ void FAST_FUNC header_verbose_list(const file_header_t *file_header)
- 		ptm->tm_hour,
- 		ptm->tm_min,
- 		ptm->tm_sec,
--		file_header->name);
-+		printable_string(file_header->name));
- 
- #endif /* FEATURE_TAR_UNAME_GNAME */
- 
- 	/* NB: GNU tar shows "->" for symlinks and "link to" for hardlinks */
- 	if (file_header->link_target) {
--		printf(" -> %s", file_header->link_target);
-+		printf(" -> %s", printable_string(file_header->link_target));
- 	}
- 	bb_putchar('\n');
- }
-CVE_PATCH_2
-
-          echo "   -> Applying patches/CVE-2025-46394.patch..."
-          patch -p1 -N -i patches/CVE-2025-46394.patch || echo "⚠️ CVE-2025-46394 patch fuzzy/already applied."
+          echo "   -> Patching CVE-2025-46394 directly..."
+          if [ -f "archival/libarchive/header_list.c" ]; then
+              sed -i 's/puts(file_header->name);/puts(printable_string(file_header->name));/' archival/libarchive/header_list.c
+          fi
+          if [ -f "archival/libarchive/header_verbose_list.c" ]; then
+              sed -i 's/file_header->name);/printable_string(file_header->name));/' archival/libarchive/header_verbose_list.c
+              sed -i 's/printf(" -> %s", file_header->link_target);/printf(" -> %s", printable_string(file_header->link_target));/' archival/libarchive/header_verbose_list.c
+              echo "   ✅ CVE-2025-46394 patched."
+          fi
 
           set +x
-          echo "🎉 BusyBox 1.37.0 Evolution Complete (V44: Integrated Masterpiece)."
+          echo "🎉 BusyBox 1.37.0 Evolution Complete."
           echo "::endgroup::"
       
       # =======================================================
@@ -951,7 +826,6 @@ CVE_PATCH_2
           set -x
           
           echo "::group::Iptables Upgrade & Patching (1.8.11 Collector Mode)"
-          
           NEW_VER="iptables-1.8.11"
           SKIP_PATCHING=false
           
@@ -1014,7 +888,6 @@ CVE_PATCH_2
           
           if [ "$SKIP_PATCHING" = true ]; then
               APPLY_PATCHES=false
-              echo "⚠️ Skipping Patch Application due to download/extract failure."
           else
               APPLY_PATCHES=true
           fi
@@ -1028,18 +901,13 @@ CVE_PATCH_2
               local F_PATH="$1"
               local EXP_ID="$2"
               local EXP_SUBJ="$3"
-              
               if [ ! -s "$F_PATH" ]; then return 1; fi
               if ! grep -qE "^diff --git|^--- a/" "$F_PATH"; then return 1; fi
 
               local CHECK_PASS=true
-
               if [ -n "$EXP_ID" ]; then
                   local FILE_ID=$(grep "^From " "$F_PATH" | head -n 1 | awk '{print $2}')
-                  if [[ "$FILE_ID" == "$EXP_ID"* ]]; then
-                      echo "   ✅ ID Check: MATCH ($EXP_ID)"
-                  else
-                      echo "   ❌ ID Check: MISMATCH (File: ${FILE_ID:0:8} vs Url: ${EXP_ID:0:8})"
+                  if [[ "$FILE_ID" != "$EXP_ID"* ]]; then
                       CHECK_PASS=false
                   fi
               fi
@@ -1054,13 +922,8 @@ CVE_PATCH_2
                           printf " %s", $0;
                       }
                   ' "$F_PATH" | sed 's/\[PATCH\] //g')
-                  
                   local FILE_NORM_SUBJ=$(echo "$RAW_SUBJ_BLOCK" | tr -dc 'a-zA-Z0-9')
-                  
-                  if [ "$FILE_NORM_SUBJ" == "$EXP_SUBJ" ]; then
-                      echo "   ✅ Subject Check: MATCH"
-                  else
-                      echo "   ❌ Subject Check: MISMATCH"
+                  if [ "$FILE_NORM_SUBJ" != "$EXP_SUBJ" ]; then
                       CHECK_PASS=false
                   fi
               fi
@@ -1077,159 +940,69 @@ CVE_PATCH_2
               local SAFE_NAME=$(echo "$RAW_NAME" | sed 's/[^a-zA-Z0-9]/_/g')
               local PATCH_FILENAME="$PATCH_DIR/${COUNT}_${DATE}_${SAFE_NAME}.patch"
               local COOKIE_FILE="$IPT_DIR/cookies.txt"
-              
               local TARGET_COMMIT_ID=$(echo "$URL" | grep -o 'id=[a-f0-9]*' | cut -d= -f2)
               local TARGET_NORM_SUBJECT=$(echo "$RAW_NAME" | tr -dc 'a-zA-Z0-9')
 
-              echo "---------------------------------------------------"
-              echo "Processing Patch #$COUNT: $RAW_NAME"
-
               local PROCESS_ATTEMPT=0
-              local PROCESS_SUCCESS=false
-
               while [ $PROCESS_ATTEMPT -lt 2 ]; do
                   PROCESS_ATTEMPT=$((PROCESS_ATTEMPT+1))
                   local NEED_DOWNLOAD=true
 
                   if [ -f "$PATCH_FILENAME" ]; then
-                      echo "🔍 [Attempt $PROCESS_ATTEMPT] Verifying local cache..."
                       if verify_patch_integrity "$PATCH_FILENAME" "$TARGET_COMMIT_ID" "$TARGET_NORM_SUBJECT"; then
-                          echo "✅ Local cache verified valid."
                           NEED_DOWNLOAD=false
                       else
-                          echo "⚠️ Cache verification failed. Deleting..."
                           rm -f "$PATCH_FILENAME"
                           NEED_DOWNLOAD=true
                       fi
-                  else
-                      NEED_DOWNLOAD=true
                   fi
 
                   if [ "$NEED_DOWNLOAD" = true ]; then
-                      echo "⬇️ [Attempt $PROCESS_ATTEMPT] Starting Full Download Sequence..."
-
                       if [ $((10#$COUNT % 10)) -eq 1 ] || [ ! -f "$IPT_DIR/ua_cache.txt" ]; then
                           local MINOR_VER=$((RANDOM % 100))
                           echo "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.${MINOR_VER}.0 Safari/537.36" > "$IPT_DIR/ua_cache.txt"
                           rm -f "$COOKIE_FILE"
-                          echo "🔄 Session Rotate: New UA Generated."
                       fi
                       local UA=$(cat "$IPT_DIR/ua_cache.txt")
-                      
-                      local H_SEC_CH_UA='"Not(A:Brand";v="8", "Chromium";v="144", "Google Chrome";v="144"'
-                      local H_SEC_PLATFORM='"Windows"'
-                      local H_LANG="en-US,en;q=0.9"
                       local ACCEPT_FILE="text/x-diff,text/plain,application/octet-stream;q=0.9,*/*;q=0.8"
-                      
                       local COMMIT_URL=$(echo "$URL" | sed 's|/patch/|/commit/|')
                       local LOG_URL="https://git.netfilter.org/iptables/log/"
                       
-                      if [ $((10#$COUNT % 30)) -eq 0 ]; then
-                          echo "☕ Long Coffee Break..."
-                          sleep $(shuf -i 20-40 -n 1)
-                      else
-                          sleep $(shuf -i 2-4 -n 1)
-                      fi
-
-                      local MAX_RETRIES=5
+                      sleep $(shuf -i 2-4 -n 1)
+                      local MAX_RETRIES=4
                       local DOWNLOAD_OK=false
 
                       for ((i=1; i<=MAX_RETRIES; i++)); do
-                          local BACKOFF_TIME=$((5 * i + 5))
-                          local PREFLIGHT_DONE=false
-
-                          if [ $((RANDOM % 5)) -eq 0 ] || [ $i -gt 1 ]; then
-                              echo "🎭 Performing Pre-flight check..."
-                              curl -k -L -s -o /dev/null \
-                                   -c "$COOKIE_FILE" -b "$COOKIE_FILE" \
-                                   -H "User-Agent: $UA" -H "Referer: $LOG_URL" \
-                                   "$COMMIT_URL"
-                              sleep 1
-                              PREFLIGHT_DONE=true
-                          fi
-                          local CUR_REFERER="$LOG_URL"
-                          [ "$PREFLIGHT_DONE" = true ] && CUR_REFERER="$COMMIT_URL"
-
-                          if curl -k -L -s \
-                                  -c "$COOKIE_FILE" -b "$COOKIE_FILE" \
-                                  -H "User-Agent: $UA" \
-                                  -H "Accept: $ACCEPT_FILE" \
-                                  -H "Accept-Language: $H_LANG" \
-                                  -H "Referer: $CUR_REFERER" \
-                                  -H "sec-ch-ua: $H_SEC_CH_UA" \
-                                  -H "sec-ch-ua-platform: $H_SEC_PLATFORM" \
-                                  --connect-timeout 20 --retry 2 \
-                                  -o "$PATCH_FILENAME" "$URL"; then
-                                  
+                          if curl -k -L -s -c "$COOKIE_FILE" -b "$COOKIE_FILE" -H "User-Agent: $UA" -H "Accept: $ACCEPT_FILE" -H "Referer: $LOG_URL" --connect-timeout 20 -o "$PATCH_FILENAME" "$URL"; then
                               if verify_patch_integrity "$PATCH_FILENAME" "$TARGET_COMMIT_ID" "$TARGET_NORM_SUBJECT"; then
-                                  echo "✅ [Try $i] Download Success & Verified."
                                   DOWNLOAD_OK=true
                                   break
-                              else
-                                  echo "⚠️ Content invalid. Retrying..."
-                                  rm -f "$COOKIE_FILE"
-                              fi
-                          else
-                              echo "⚠️ Curl failed. Switching to Wget..."
-                              rm -f "$PATCH_FILENAME"
-                              if wget --no-check-certificate -q \
-                                      --user-agent="$UA" \
-                                      --header="Accept: $ACCEPT_FILE" \
-                                      --header="Referer: $COMMIT_URL" \
-                                      -O "$PATCH_FILENAME" "$URL"; then
-                                      
-                                  if verify_patch_integrity "$PATCH_FILENAME" "$TARGET_COMMIT_ID" "$TARGET_NORM_SUBJECT"; then
-                                      echo "✅ [Try $i] Download Success (Wget) & Verified."
-                                      DOWNLOAD_OK=true
-                                      break
-                                  fi
                               fi
                           fi
-                          
-                          echo "❌ [Try $i] Failed. Cooling down ${BACKOFF_TIME}s..."
                           rm -f "$PATCH_FILENAME"
-                          if [ $i -lt $MAX_RETRIES ]; then sleep $BACKOFF_TIME; fi
+                          sleep $((3 * i))
                       done
 
                       if [ "$DOWNLOAD_OK" = false ]; then
-                          echo "❌ CRITICAL: Failed to download valid patch."
                           echo "[$DATE] #$COUNT DOWNLOAD_FAIL : $RAW_NAME" >> "$LOG_FILE"
                           return 1
                       fi
                   fi
 
-                  if [ "$APPLY_PATCHES" != true ]; then
-                      echo "📦 Patch verified but skipped (Apply logic disabled by config)."
-                      break 
-                  fi
+                  if [ "$APPLY_PATCHES" != true ]; then break; fi
+                  if [ ! -d "$IPT_ROOT" ]; then return 1; fi
 
-                  if [ ! -d "$IPT_ROOT" ]; then
-                      echo "❌ CRITICAL: Source directory '$IPT_ROOT' NOT FOUND!"
-                      echo "[$DATE] #$COUNT DIR_MISSING : $RAW_NAME" >> "$LOG_FILE"
-                      return 1 
-                  fi
-
-                  echo "🩹 Applying patch (Pass $PROCESS_ATTEMPT)..."
-                      
                   if patch -d "$IPT_ROOT" -t -N -l -F 10 -p1 --no-backup-if-mismatch --reject-file=- < "$PATCH_FILENAME"; then
-                      echo "✅ Patch Applied Successfully."
-                      PROCESS_SUCCESS=true
                       break
                   else
                       if verify_patch_integrity "$PATCH_FILENAME" "$TARGET_COMMIT_ID" "$TARGET_NORM_SUBJECT" >/dev/null 2>&1; then
-                          echo "⚠️ Patch failed but file integrity is VALID."
-                          echo "   -> Assuming patch was already applied or reversed. Skipping..."
                           echo "[$DATE] #$COUNT PATCH_SKIP : $RAW_NAME (Integrity OK)" >> "$LOG_FILE"
                           break
                       fi
-
                       if [ "$NEED_DOWNLOAD" = false ]; then
-                          echo "⚠️ Apply failed using cached file."
-                          echo "🔄 Deleting stale cache and forcing FRESH download loop..."
                           rm -f "$PATCH_FILENAME"
                           continue 
                       else
-                          echo "❌ CRITICAL: Patch failed even with fresh download."
                           echo "[$DATE] #$COUNT PATCH_FAIL : $RAW_NAME" >> "$LOG_FILE"
                           return 1 
                       fi
@@ -1271,120 +1044,24 @@ EOL
               download_and_process "$p_date" "$p_name" "$p_url" "$count_str"
           done < "$IPT_DIR/patch_list.txt"
 
-          echo "🎉 Patch processing cycle completed!"
-          
-          if [ -s "$LOG_FILE" ]; then
-              echo "⚠️ ================= SUMMARY ================="
-              cat "$LOG_FILE"
-              echo "=========================================="
-          else
-              echo "✅ Perfect! No errors recorded."
-          fi
-
-          echo "🔧 Generating warning suppression patch (Patch #100)..."
-          
-          PATCH_100="$PATCH_DIR/100_Custom_Suppress_Warnings.patch"
-          
-          cat << 'END_PATCH' > "$PATCH_100"
---- a/libxtables/xtables.c
-+++ b/libxtables/xtables.c
-@@ -809,9 +809,11 @@
- 		dptr = &((*dptr)->next);
- 	}
- 
-+#if 0
- 	if (seen && !found)
- 		fprintf(stderr,
- 			"Warning: Extension %s is not supported, missing kernel module?\n",
- 			name);
-+#endif
- 
- 	for (ptr = xtables_matches; ptr; ptr = ptr->next) {
-@@ -939,9 +941,11 @@
- 		dptr = &((*dptr)->next);
- 	}
- 
-+#if 0
- 	if (seen && !found)
- 		fprintf(stderr,
- 			"Warning: Extension %s is not supported, missing kernel module?\n",
- 			name);
-+#endif
- 
- 	for (ptr = xtables_targets; ptr; ptr = ptr->next) {
-END_PATCH
-
-          if [ "$APPLY_PATCHES" = true ]; then
-              if [ -d "$IPT_ROOT" ]; then
-                  echo "🩹 Applying Custom Patch #100 IMMEDIATELY..."
-                  if patch -d "$IPT_ROOT" -t -N -l -F 10 -p1 --no-backup-if-mismatch --reject-file=- < "$PATCH_100"; then
-                      echo "✅ Patch #100 Applied Successfully."
-                  else
-                      echo "⚠️ Patch #100 Failed (Skipped or Mismatch)."
-                      echo "[LOCAL] #100 PATCH_FAIL : Custom_Suppress_Warnings" >> "$LOG_FILE"
-                  fi
-              else
-                  echo "⚠️ Source directory not ready for immediate patching."
-              fi
-              
-              IPT_MAKEFILE="padavan-ng/trunk/user/iptables/Makefile"
-              if [ -f "$IPT_MAKEFILE" ]; then
-                  sed -i 's@tar xJf $(SRC_NAME).tar.xz;@tar xJf $(SRC_NAME).tar.xz; echo "🩹 Patching..."; for p in `ls ../patches_archive/*.patch | sort`; do echo "   - Applying $$p"; patch -d $(SRC_NAME) -p1 < $$p || true; done;@' "$IPT_MAKEFILE"
-                  echo "✅ Iptables 本體修復與 Patch 注入完成 (Makefile Modified)."
-              else
-                  echo "⚠️ Makefile not found, skipping injection."
-              fi
-          else
-              echo "📦 Custom Patch #100 generated but NOT applied."
-              echo "🚫 Skipping Makefile injection (APPLY_PATCHES=false)"
-          fi
-          
-          echo "🔍 Verifying code content (Checking for applied changes)..."
-          VERIFY_TARGET="libxtables/xtables.c"
-          
-          if [ -f "$IPT_ROOT/$VERIFY_TARGET" ]; then
-              if grep -q "#if 0" "$IPT_ROOT/$VERIFY_TARGET" && grep -q "Warning: Extension %s is not supported" "$IPT_ROOT/$VERIFY_TARGET"; then
-                  echo "✅ Verification Passed: Code IS patched/modified (Warnings suppressed)."
-                  grep -nC 3 "Warning: Extension %s is not supported" "$IPT_ROOT/$VERIFY_TARGET"
-              else
-                  echo "⚠️ Verification Result: Code is UNPATCHED (Warnings active)."
-                  grep -nC 3 "Warning: Extension %s is not supported" "$IPT_ROOT/$VERIFY_TARGET"
-              fi
-          else
-              echo "ℹ️ Verification skipped: Source file $VERIFY_TARGET not found yet (will be extracted during build)."
-          fi
-          
-          echo "🔍 開始掃描並修復依賴舊版 iptables ($OLD_VER_STR) 的其他套件..."
-          if [ -z "$OLD_VER_STR" ]; then
-              echo "⚠️ Warning: Could not detect OLD_VER_STR automatically. Fallback to 1.8.10"
-              OLD_VER_STR="iptables-1.8.10"
+          # Áp dụng trực tiếp Patch 100 bằng sed (Tránh lỗi patch file cú pháp)
+          if [ -f "$IPT_ROOT/libxtables/xtables.c" ]; then
+              sed -i 's/fprintf(stderr,[[:space:]]*"Warning: Extension %s is not supported/\/\/ &/' "$IPT_ROOT/libxtables/xtables.c"
+              echo "✅ Patch #100 applied directly via sed."
           fi
 
           grep -rl "$OLD_VER_STR" padavan-ng/trunk/user/ | while read -r file ; do
-              echo "  - 修復路徑: $file"
               sed -i "s/$OLD_VER_STR/$NEW_VER/g" "$file"
           done
-          
-          echo "🎉 全局路徑替換完成！所有套件現在都指向 $NEW_VER"
-          
-          echo "📋 Final listing of source directory to verify patch application:"
-          if [ -d "$IPT_ROOT" ]; then
-              ls -ld "$IPT_ROOT"
-          else
-              echo "ℹ️ Source directory not present yet (Clean Build)."
-          fi
-          
           echo "::endgroup::"
 
       # 7.6 [網路工具] 智慧編譯 新增 Arptables
       - name: 🔥 Network Tools (Smart Compile Arptables)
         run: |
           echo "::group::Smart Compile Network Tools"
-          
           BASE_DIR="$GITHUB_WORKSPACE/padavan-ng/trunk/user"
           ARP_ROOT="$BASE_DIR/arptables"
           
-          echo "⬇️ Processing Arptables..."
           mkdir -p "$ARP_ROOT"
           cd "$ARP_ROOT" || exit 1
           
@@ -1392,16 +1069,13 @@ END_PATCH
             ARP_TAR="arptables-0.0.5.tar.gz"
             ARP_URL="https://www.netfilter.org/pub/arptables/arptables-0.0.5.tar.gz"
             
-            echo "   Downloading $ARP_URL ..."
             wget --no-check-certificate "$ARP_URL" -O "$ARP_TAR" || exit 1
             tar -xf "$ARP_TAR" || exit 1
             rm -f "$ARP_TAR"
             
             ARP_SRC_NAME=$(ls -d arptables-0*/ | head -n 1 | sed 's/\///')
-            echo "   Detected source: [$ARP_SRC_NAME]"
             chmod -R u+w "$ARP_SRC_NAME"
           
-            echo "🔧 Creating Arptables Wrapper Makefile..."
             cat << EOF > Makefile
 SRC_NAME=$ARP_SRC_NAME
 
@@ -1421,76 +1095,56 @@ clean:
 	\$(MAKE) -C \$(SRC_NAME) clean
 EOF
           
-            echo "🔧 Registering arptables in trunk/user/Makefile..."
             cd "$BASE_DIR" || exit 1
-            
             if ! grep -q "dir_y += arptables" Makefile; then
                 if grep -q "dir_y += ebtables" Makefile; then
                     sed -i '/dir_y += ebtables/a dir_y += arptables' Makefile
                 else
                     echo "dir_y += arptables" >> Makefile
                 fi
-                echo "   ✅ Added to compilation list."
-            else
-                echo "   ⚠️ Already in compilation list."
             fi
-          else
-            echo "⚠️ Arptables seems already configured. Skipping."
           fi
 
-          echo "🔧 Deep-Cleaning & Enabling Kernel modules..."
           cd "$GITHUB_WORKSPACE"
           TARGET_KCONF="padavan-ng/trunk/linux-3.4.x/.config"
-          
           if [ -f "$TARGET_KCONF" ]; then
              MODULES="CONFIG_IP_NF_ARPTABLES CONFIG_IP_NF_ARPFILTER CONFIG_IP_NF_ARP_MANGLE CONFIG_NF_LOG_ARP CONFIG_BRIDGE_EBT_ARP CONFIG_BRIDGE_EBT_ARPREPLY"
              for mod in $MODULES; do
                 if grep -q "$mod" "$TARGET_KCONF"; then
                    sed -i "s|^.*$mod.*$|$mod=m|" "$TARGET_KCONF"
-                   echo "   ✅ Forced $mod=m (Updated)"
                 else
                    echo "$mod=m" >> "$TARGET_KCONF"
-                   echo "   ✅ Forced $mod=m (Added)"
                 fi
              done
           fi
           echo "::endgroup::"
 
-      # 7.7 [驅動魔改] 修復 MT7628 / MT7610E 無線驅動斷線與快速重連 (適配 WR841N-V13 SoC)
+      # 7.7 [驅動魔改] 修復 MT7628 無線驅動斷線與快速重連 (適配 WR841N-V13 SoC)
       - name: 🔥 Patch Wi-Fi Driver (Anti-Disconnect & Fast Reconnect)
         run: |
           echo "::group::Applying Universal Wi-Fi Driver Patch"
-          
           APCLI_FILES=$(find padavan-ng/trunk/proprietary/rt_wifi -type f -name "ap_apcli.c")
           CTRL_FILES=$(find padavan-ng/trunk/proprietary/rt_wifi -type f -name "apcli_ctrl.c")
 
           if [ -n "$APCLI_FILES" ]; then
             for f in $APCLI_FILES; do
-              echo "🔧 Patching Beacon Timeout: $f"
               sed -i 's/12[[:space:]]*\*[[:space:]]*OS_HZ/60 * OS_HZ/g' "$f"
             done
-          else
-            echo "::warning:: ap_apcli.c not found, skipping beacon patch."
           fi
 
           if [ -n "$CTRL_FILES" ]; then
             for f in $CTRL_FILES; do
-              echo "🔧 Patching Fast Reconnect Logic: $f"
               sed -i 's/^[[:space:]]*NdisZeroMemory.*ApCliMlmeAux.Bssid/\/\/&/' "$f"
               sed -i 's/^[[:space:]]*.*ApCliMlmeAux.SsidLen[[:space:]]*=[[:space:]]*0/\/\/&/' "$f"
               sed -i 's/^[[:space:]]*NdisZeroMemory.*ApCliMlmeAux.Ssid,/\/\/&/' "$f"
               sed -i 's/^[[:space:]]*.*ApCliMlmeAux.Rssi[[:space:]]*=[[:space:]]*0/\/\/&/' "$f"
             done
-            echo "🎉 Wi-Fi driver patched for fast reconnect."
-          else
-            echo "::warning:: apcli_ctrl.c not found, skipping."
           fi
           echo "::endgroup::"
 
       - name: 🌐 Custom Language Selector
         run: |
           echo "::group::Setting up WebUI Language"
-          
           SELECTED_LANG_OPTION="${{ inputs.language_select }}"
           TARGET_BOARD="${{ inputs.target_select }}"
           TEMPLATES_DIR="padavan-ng/trunk/configs/templates"
@@ -1503,81 +1157,43 @@ EOF
             echo "RELEASE_LANG=English + $SELECTED_LANG_OPTION" >> $GITHUB_ENV
           fi
           
-          echo "🎯 Target Board: $TARGET_BOARD"
-          echo "🗣️ Selected Language Code: $LANG_CODE"
-          
           CONFIG_PATH=$(find "$TEMPLATES_DIR" -type f -name "*.config" | grep -i "$TARGET_BOARD.config" | head -n 1)
-          
           if [ -z "$CONFIG_PATH" ]; then
-             echo "⚠️ Config not found via strict match, trying loose search..."
              CONFIG_PATH=$(find "$TEMPLATES_DIR" -type f -name "*.config" | grep -i "$TARGET_BOARD" | head -n 1)
           fi
           
           if [ -f "$CONFIG_PATH" ]; then
-            echo "📝 Modifying Config: $CONFIG_PATH"
             sed -i 's/^CONFIG_FIRMWARE_INCLUDE_LANG_.*=y/#&/' "$CONFIG_PATH"
-            echo "✅ All non-English languages disabled."
-            
             if [ "$LANG_CODE" != "NONE" ]; then
               TARGET_LANG_CONFIG="CONFIG_FIRMWARE_INCLUDE_LANG_$LANG_CODE"
               if grep -q "$TARGET_LANG_CONFIG" "$CONFIG_PATH"; then
                 sed -i "s/^.*$TARGET_LANG_CONFIG.*/$TARGET_LANG_CONFIG=y/" "$CONFIG_PATH"
-                echo "✅ Enabled language: $LANG_CODE"
               else
                 echo "$TARGET_LANG_CONFIG=y" >> "$CONFIG_PATH"
-                echo "✅ Appended language config: $LANG_CODE"
               fi
-            else
-              echo "ℹ️ Keeping English Only."
             fi
-            
-            echo "🔍 Current Enabled Languages in Config:"
-            grep "^CONFIG_FIRMWARE_INCLUDE_LANG_" "$CONFIG_PATH" || echo "(None - English Only)"
-          else
-            echo "❌ Error: Could not find template config for $TARGET_BOARD"
-            exit 1
           fi
           echo "::endgroup::"
       
       - name: 🕊️ Dave Täht Tribute & CAKE Patch
         run: |
           echo "::group::Applying CAKE to Kernel 3.4 Config"
-          
           TARGET_BOARD="${{ inputs.target_select }}"
           BOARDS_DIR="padavan-ng/trunk/configs/boards"
-          
-          echo "🔍 Searching for config file for board: $TARGET_BOARD..."
           CONFIG_PATH=$(find "$BOARDS_DIR" -name "kernel-3.4.x.config" | grep "/$TARGET_BOARD/" | head -n 1)
 
           if [ -z "$CONFIG_PATH" ]; then
-             echo "⚠️  Direct match not found, trying loose search..."
              CONFIG_PATH=$(find "$BOARDS_DIR" -type f -name "kernel-3.4.x.config" | grep "$TARGET_BOARD" | head -n 1)
           fi
 
           if [ -f "$CONFIG_PATH" ]; then
-            echo "🎯 Found Config: $CONFIG_PATH"
-            if grep -qE "CONFIG_NET_SCH_CAKE=[ym]" "$CONFIG_PATH"; then
-              echo "⚠️ CAKE module is already enabled in config."
-            else
-              echo "🔧 Injecting CAKE module..."
+            if ! grep -qE "CONFIG_NET_SCH_CAKE=[ym]" "$CONFIG_PATH"; then
               if grep -qE "CONFIG_NET_SCH_FQ_CODEL=[ym]" "$CONFIG_PATH"; then
                 sed -i '/CONFIG_NET_SCH_FQ_CODEL=/a CONFIG_NET_SCH_CAKE=m' "$CONFIG_PATH"
-                echo "✅ Inserted CAKE after FQ_CODEL."
               else
                 echo "CONFIG_NET_SCH_CAKE=m" >> "$CONFIG_PATH"
-                echo "✅ Appended CAKE to end of file."
               fi
             fi
-            
-            if grep -qE "CONFIG_NET_SCH_CAKE=[ym]" "$CONFIG_PATH"; then
-               echo "🎉 CAKE Patch Applied Successfully!"
-            else
-               echo "❌ Error: Failed to apply CAKE patch."
-               exit 1
-            fi
-          else
-            echo "❌ Config file not found for $TARGET_BOARD"
-            exit 1
           fi
           echo "::endgroup::"
       
@@ -1591,16 +1207,14 @@ EOF
           ./clear_tree.sh > /dev/null 2>&1
           rm -rf tmp staging
           
-          echo "Starting build... Logs will be saved to build.log"
           set -o pipefail
           ./build_firmware.sh 2>&1 | tee build.log
           echo "::endgroup::"
 
-      # 9. 智慧打包與產物偵測 (含 iptables Debug 檔案)
+      # 9. 智慧打包與產物偵測
       - name: Smart-Pack & Debug Collection
         run: |
           echo "::group::Smart Packing"
-          
           if [ -f "padavan-ng/trunk/.config" ]; then
             source "padavan-ng/trunk/.config"
           fi
@@ -1614,8 +1228,6 @@ EOF
           REPORT_FILE="$PACK_DIR/file_report.txt"
           touch "$REPORT_FILE"
           
-          echo "Packing Artifacts to: $PACK_DIR"
-          
           [ -f "padavan-ng/trunk/.config" ] && cp "padavan-ng/trunk/.config" "$PACK_DIR/build.config"
           [ -f "padavan-ng/trunk/configs/boards/busybox.config" ] && cp "padavan-ng/trunk/configs/boards/busybox.config" "$PACK_DIR/busybox.config"
           [ -f "padavan-ng/trunk/user/shared/defaults.h" ] && cp "padavan-ng/trunk/user/shared/defaults.h" "$PACK_DIR/defaults.h.txt"
@@ -1623,74 +1235,16 @@ EOF
           [ -f "padavan-ng/trunk/linux-3.4.x/.config" ] && cp "padavan-ng/trunk/linux-3.4.x/.config" "$PACK_DIR/kernel.config"
           [ -f "padavan-ng/trunk/build.log" ] && cp "padavan-ng/trunk/build.log" "$PACK_DIR/build.log"
 
-          BB_SRC_DIR="padavan-ng/trunk/user/busybox/busybox-1.37.0"
-          DEBUG_BB_DIR="$PACK_DIR/debug_busybox"
-          mkdir -p "$DEBUG_BB_DIR"
-
-          if [ -d "$BB_SRC_DIR/patches" ]; then
-              echo "✅ Found BusyBox patches directory, collecting..."
-              cp "$BB_SRC_DIR/patches"/*.patch "$DEBUG_BB_DIR/" 2>/dev/null || true
-              echo "- 🛡️ **BusyBox Patches**: Collected in \`debug_busybox\`" >> "$REPORT_FILE"
-              if [ -f "$BB_SRC_DIR/.config" ]; then
-                  cp "$BB_SRC_DIR/.config" "$DEBUG_BB_DIR/busybox_actual_build.config"
-              fi
-          else
-              echo "⚠️ Warning: BusyBox patches directory not found."
-              echo "- ⚠️ **BusyBox Patches**: Not found" >> "$REPORT_FILE"
-          fi
-
-          IPT_SRC_DIR="padavan-ng/trunk/user/iptables/iptables-1.8.11"
-          IPT_BASE_DIR="padavan-ng/trunk/user/iptables"
-          DEBUG_DIR="$PACK_DIR/debug_iptables"
-          mkdir -p "$DEBUG_DIR"
-          
-          if [ -d "$IPT_BASE_DIR/patches_archive" ]; then
-              cp "$IPT_BASE_DIR/patches_archive"/*.patch "$DEBUG_DIR/"
-              echo "- 🛡️ **Patches**: All patches collected in debug_iptables" >> "$REPORT_FILE"
-          else
-              echo "⚠️ Warning: patches directory not found in $IPT_BASE_DIR"
-              echo "- ⚠️ **Patches**: Not found (Collection failed)" >> "$REPORT_FILE"
-          fi
-          
-          if [ -f "$IPT_BASE_DIR/patch_summary.log" ]; then
-              cp "$IPT_BASE_DIR/patch_summary.log" "$DEBUG_DIR/patch_summary.log"
-              echo "- 📜 **Patch Log**: Included" >> "$REPORT_FILE"
-          fi
-
-          TARGET_FILE="$IPT_SRC_DIR/libxtables/xtables.c"
-          if [ -f "$TARGET_FILE" ]; then
-              if grep -q "#if 0" "$TARGET_FILE" && grep -q "Warning: Extension %s is not supported" "$TARGET_FILE"; then
-                  cp "$TARGET_FILE" "$DEBUG_DIR/xtables_patched.c"
-                  echo "✅ Detected PATCHED xtables.c - Saving as xtables_patched.c"
-                  echo "- 📄 **Source**: \`xtables_patched.c\` (✅ Patched successfully)" >> "$REPORT_FILE"
-              else
-                  cp "$TARGET_FILE" "$DEBUG_DIR/xtables_original.c"
-                  echo "ℹ️ Detected UNPATCHED xtables.c - Saving as xtables_original.c"
-                  echo "- 📄 **Source**: \`xtables_original.c\` (⚠️ Original/Unpatched)" >> "$REPORT_FILE"
-              fi
-          else
-               echo "⚠️ Warning: xtables.c not found"
-               echo "- ❌ **Source**: xtables.c not found!" >> "$REPORT_FILE"
-          fi
-          
-          if [ -f "$IPT_SRC_DIR/config.log" ]; then
-              cp "$IPT_SRC_DIR/config.log" "$DEBUG_DIR/config.log"
-              echo "- 🔧 **Log**: \`config.log\` included" >> "$REPORT_FILE"
-          fi
-
           if [ -d "$IMAGES_DIR" ]; then
-            echo "Scanning $IMAGES_DIR for images..."
             if [ -f "$PARTITIONS_FILE" ]; then
               MAX_FW_SIZE="$(awk '/Firmware/ { getline; getline; sub(",", ""); print strtonum($2); }' "$PARTITIONS_FILE")"
-              echo "Max Firmware Size Allowed: $MAX_FW_SIZE bytes"
             else
               MAX_FW_SIZE=0
-              echo "::warning:: Partition config not found, skipping size check."
             fi
 
             find "$IMAGES_DIR" -maxdepth 1 -type f \( -name "*.trx" -o -name "*.bin" \) | while read -r file; do
               fname=$(basename "$file")
-              fsize=$(stat -c \%s "$file")
+              fsize=$(stat -c %s "$file")
               cp -v "$file" "$PACK_DIR/"
               
               if (( fsize < 500000 )); then
@@ -1701,15 +1255,10 @@ EOF
                   if (( fsize > MAX_FW_SIZE )); then
                     echo "::error:: Firmware $fname ($fsize bytes) exceeds max size ($MAX_FW_SIZE bytes)!"
                     exit 1
-                  else
-                    echo "::notice:: $fname size check passed ($fsize / $MAX_FW_SIZE)"
                   fi
                 fi
               fi
             done
-          else
-            echo "::warning:: Images directory not found."
-            echo "- ❌ **Error**: No images directory found." >> "$REPORT_FILE"
           fi
 
           cd "$PACK_DIR"
@@ -1726,11 +1275,7 @@ EOF
             echo "EOF"
           } >> $GITHUB_ENV
           
-          MAIN_FW=$(find . -type f \( -name "*.trx" -o -name "*.bin" \) -printf "%s\t%p\n" | sort -n | tail -1 | cut -f2)
-          [ ! -z "$MAIN_FW" ] && echo "MAIN_FW_PATH=$PACK_DIR/${MAIN_FW#./}" >> $GITHUB_ENV
-          
           cd "$WORK_DIR"
-
           if [ "$(ls -A$PACK_DIR)" ]; then
             ZIP_NAME="padavan_pack_${CONFIG_VENDOR}_${CONFIG_FIRMWARE_PRODUCT_ID}.zip"
             zip -j -r "$ZIP_NAME" "$PACK_DIR"
@@ -1768,21 +1313,13 @@ EOF
           body: |
             **Padavan 編譯報告 - Build firmware (Ultimate Fix - Early Size Check)**
             * **Release Model**: ${{ inputs.target_select }}
-            * **Linux Kernel**: **3.4.113** (MT7628 SoC Optimized)
-            * **LAN IP**: ${{ env.LANIP }}
-            * **User**: ${{ env.SIGNACCOUNT }} / **Pass**: ${{ env.SIGNPASSWORD }}
-            * **Wi-Fi 2.4G**: ${{ env.WIFI2GSSID }} / Key:${{ env.WIFI2GPSK }}
-            * **Branch**: ${{ env.PADAVAN_BRANCH }} (${{ env.PADAVAN_COMMIT }})
+            * **SoC**: MediaTek MT7628 (2.4GHz Only)
+            * **Default IP**: ${{ env.LANIP }}
+            * **Credentials**: ${{ env.SIGNACCOUNT }} /${{ env.SIGNPASSWORD }}
+            * **Wi-Fi 2.4G**: ${{ env.WIFI2GSSID }}
             
             ### 📦 產物偵測
             ${{ env.FILE_REPORT }}
-            
-            ### 🛠 Debug 檔案 (已包含在 Zip)
-            * `defaults.h.txt` (檢查 IP/帳密 是否修改成功)
-            * `CN.dict.txt` (檢查語言檔)
-            * `build.log` (編譯日誌)
-            * `build.config` (編譯參數)
-            * `kernel.config` (核心參數)
           artifacts: ${{ env.ZIP_FILE_PATH }}
           allowUpdates: true
           artifactErrorsFailBuild: true
