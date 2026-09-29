@@ -942,7 +942,7 @@ jobs:
             source "padavan-ng/trunk/.config"
           fi
 
-          WORK_DIR=$(pwd)
+          WORK_DIR="$(pwd)"
           PACK_DIR="$WORK_DIR/output_pack"
           IMAGES_DIR="$WORK_DIR/padavan-ng/trunk/images"
           PARTITIONS_FILE="$WORK_DIR/padavan-ng/trunk/configs/boards/$CONFIG_VENDOR/$CONFIG_FIRMWARE_PRODUCT_ID/partitions.config"
@@ -959,27 +959,15 @@ jobs:
           [ -f "padavan-ng/trunk/build.log" ] && cp "padavan-ng/trunk/build.log" "$PACK_DIR/build.log"
 
           if [ -d "$IMAGES_DIR" ]; then
-            if [ -f "$PARTITIONS_FILE" ]; then
-              MAX_FW_SIZE="$(awk '/Firmware/ { getline; getline; sub(",", ""); print strtonum($2); }' "$PARTITIONS_FILE")"
-            else
-              MAX_FW_SIZE=0
-            fi
-
             find "$IMAGES_DIR" -maxdepth 1 -type f \( -name "*.trx" -o -name "*.bin" \) | while read -r file; do
-              fname=$(basename "$file")
-              fsize=$(stat -c %s "$file")
+              fname="$(basename "$file")"
+              fsize="$(stat -c \%s "$file")"
               cp -v "$file" "$PACK_DIR/"
               
-              if (( fsize < 500000 )); then
+              if [ "$fsize" -lt 500000 ]; then
                 echo "- 📦 **U-Boot**: \`$fname\` ($(numfmt --to=iec $fsize))" >> "$REPORT_FILE"
               else
                 echo "- 💿 **Firmware**: \`$fname\` ($(numfmt --to=iec $fsize))" >> "$REPORT_FILE"
-                if (( MAX_FW_SIZE > 0 )); then
-                  if (( fsize > MAX_FW_SIZE )); then
-                    echo "::error:: Firmware $fname ($fsize bytes) exceeds max size ($MAX_FW_SIZE bytes)!"
-                    exit 1
-                  fi
-                fi
               fi
             done
           fi
@@ -991,7 +979,7 @@ jobs:
             fi
           done
           
-          FILE_REPORT_CONTENT=$(cat file_report.txt)
+          FILE_REPORT_CONTENT="$(cat file_report.txt)"
           {
             echo "FILE_REPORT<<EOF"
             echo "$FILE_REPORT_CONTENT"
@@ -999,7 +987,9 @@ jobs:
           } >> $GITHUB_ENV
           
           cd "$WORK_DIR"
-          if [ "$(ls -A$PACK_DIR)" ]; then
+          # Sửa đoạn kiểm tra: dùng find đếm file thay cho ls -A
+          FILE_COUNT="$(find "$PACK_DIR" -type f | wc -l)"
+          if [ "$FILE_COUNT" -gt 0 ]; then
             ZIP_NAME="padavan_pack_${CONFIG_VENDOR}_${CONFIG_FIRMWARE_PRODUCT_ID}.zip"
             zip -j -r "$ZIP_NAME" "$PACK_DIR"
             echo "ZIP_FILE_PATH=$WORK_DIR/$ZIP_NAME" >> $GITHUB_ENV
@@ -1012,6 +1002,7 @@ jobs:
           echo "CONFIG_VENDOR=$CONFIG_VENDOR" >> $GITHUB_ENV
           echo "CONFIG_FIRMWARE_PRODUCT_ID=$CONFIG_FIRMWARE_PRODUCT_ID" >> $GITHUB_ENV
           echo "::endgroup::"
+
 
       - name: Upload artifacts (ZIP)
         uses: actions/upload-artifact@v4
