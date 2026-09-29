@@ -945,7 +945,6 @@ jobs:
           WORK_DIR="$(pwd)"
           PACK_DIR="$WORK_DIR/output_pack"
           IMAGES_DIR="$WORK_DIR/padavan-ng/trunk/images"
-          PARTITIONS_FILE="$WORK_DIR/padavan-ng/trunk/configs/boards/$CONFIG_VENDOR/$CONFIG_FIRMWARE_PRODUCT_ID/partitions.config"
           
           mkdir -p "$PACK_DIR"
           REPORT_FILE="$PACK_DIR/file_report.txt"
@@ -987,10 +986,9 @@ jobs:
           } >> $GITHUB_ENV
           
           cd "$WORK_DIR"
-          # Sửa đoạn kiểm tra: dùng find đếm file thay cho ls -A
           FILE_COUNT="$(find "$PACK_DIR" -type f | wc -l)"
           if [ "$FILE_COUNT" -gt 0 ]; then
-            ZIP_NAME="padavan_pack_${CONFIG_VENDOR}_${CONFIG_FIRMWARE_PRODUCT_ID}.zip"
+            ZIP_NAME="padavan_pack_wr841n_v13.zip"
             zip -j -r "$ZIP_NAME" "$PACK_DIR"
             echo "ZIP_FILE_PATH=$WORK_DIR/$ZIP_NAME" >> $GITHUB_ENV
           else
@@ -998,41 +996,13 @@ jobs:
             exit 1
           fi
           
-          echo "BUILD_TIMESTAMP=$(TZ='Asia/Taipei' date '+\%Y.\%m.\%d_\%H.\%M.\%S')" >> $GITHUB_ENV
-          echo "CONFIG_VENDOR=$CONFIG_VENDOR" >> $GITHUB_ENV
-          echo "CONFIG_FIRMWARE_PRODUCT_ID=$CONFIG_FIRMWARE_PRODUCT_ID" >> $GITHUB_ENV
+          # Đảm bảo chuỗi ngày giờ sạch sẽ, không chứa ký tự escape gạch chéo
+          CLEAN_TIME="$(TZ='Asia/Ho_Chi_Minh' date '+%Y.%m.%d_%H%M%S')"
+          echo "BUILD_TIMESTAMP=$CLEAN_TIME" >> $GITHUB_ENV
           echo "::endgroup::"
-
 
       - name: Upload artifacts (ZIP)
         uses: actions/upload-artifact@v4
         with:
-          name: padavan_${{ env.CONFIG_VENDOR }}_${{ env.CONFIG_FIRMWARE_PRODUCT_ID }}_${{ env.BUILD_TIMESTAMP }}
+          name: padavan_firmware_wr841n_v13
           path: ${{ env.ZIP_FILE_PATH }}
-
-      - name: Set Release Tag
-        if: github.event_name == 'workflow_dispatch'
-        run: |
-          echo "TAG_NAME=${{ inputs.target_select }}-${{ env.BUILD_TIMESTAMP }}" >> $GITHUB_ENV
-
-      - name: Publish Release
-        if: github.event_name == 'workflow_dispatch'
-        uses: ncipollo/release-action@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit: ${{ github.sha }}
-          tag: ${{ env.TAG_NAME }}
-          name: ${{ inputs.target_select }} [${{ env.BUILD_TIMESTAMP }}]
-          body: |
-            **Padavan 編譯報告 - Build firmware (Ultimate Fix - Early Size Check)**
-            * **Release Model**: ${{ inputs.target_select }}
-            * **SoC**: MediaTek MT7628 (2.4GHz Only)
-            * **Default IP**: ${{ env.LANIP }}
-            * **Credentials**: ${{ env.SIGNACCOUNT }} /${{ env.SIGNPASSWORD }}
-            * **Wi-Fi 2.4G**: ${{ env.WIFI2GSSID }}
-            
-            ### 📦 產物偵測
-            ${{ env.FILE_REPORT }}
-          artifacts: ${{ env.ZIP_FILE_PATH }}
-          allowUpdates: true
-          artifactErrorsFailBuild: true
