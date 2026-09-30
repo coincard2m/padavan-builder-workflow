@@ -956,6 +956,26 @@ jobs:
           [ -f "padavan-ng/trunk/user/www/dict/CN.dict" ] && cp "padavan-ng/trunk/user/www/dict/CN.dict" "$PACK_DIR/CN.dict.txt"
           [ -f "padavan-ng/trunk/linux-3.4.x/.config" ] && cp "padavan-ng/trunk/linux-3.4.x/.config" "$PACK_DIR/kernel.config"
           [ -f "padavan-ng/trunk/build.log" ] && cp "padavan-ng/trunk/build.log" "$PACK_DIR/build.log"
+      - name: Generate Breed TRX from TP-Link bin
+        run: |
+          IMAGES_DIR="$GITHUB_WORKSPACE/padavan-ng/trunk/images"
+          cd "$IMAGES_DIR"
+          for bin in *.bin; do
+            if [ -f "$bin" ]; then
+              echo "Extracting kernel+rootfs from $bin..."
+              # Cắt bỏ đúng 512 byte header TP-Link ("ver. 2.0")
+              dd if="$bin" of=kernel_rootfs.raw bs=512 skip=1
+              
+              # Tải và biên dịch công cụ otrx nhỏ gọn để đóng gói header HDR0 chuẩn cho Breed
+              curl -sSL https://raw.githubusercontent.com/openwrt/openwrt/master/tools/firmware-utils/src/otrx.c -o otrx.c
+              gcc -O2 otrx.c -o otrx
+              
+              # Đóng gói thành file .trx chuẩn
+              ./otrx create "${bin%.bin}.trx" -f kernel_rootfs.raw
+              rm -f kernel_rootfs.raw otrx otrx.c
+              echo "Created TRX: ${bin%.bin}.trx"
+            fi
+          done
 
           if [ -d "$IMAGES_DIR" ]; then
             find "$IMAGES_DIR" -maxdepth 1 -type f \( -name "*.trx" -o -name "*.bin" \) | while read -r file; do
