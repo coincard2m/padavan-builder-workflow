@@ -930,15 +930,20 @@ jobs:
           
           ./clear_tree.sh > /dev/null 2>&1
           rm -rf tmp staging
-          # 1. Ép phân vùng Firmware của Padavan dịch từ 0x20000 lên 0x50000 (khớp 100% với Breed 公版)
-          find configs/boards -name "partitions.config" -exec sed -i 's/0x00020000/0x00050000/g' {} +
 
-          # 2. Xóa TPLINK_HWID để ép Makefile build thẳng ra file .trx chuẩn
+          # 1. Sửa trực tiếp file pt_tplink_8m_bigstor.config cho khớp layout Breed 0x50000
+          CONFIG_FILE="configs/boards/TPLINK/pt_tplink_8m_bigstor.config"
+          sed -i 's/size:\t0x20000,/size:\t0x50000,/g' "$CONFIG_FILE"
+          sed -i 's/offset:\t0x20000,/offset:\t0x50000,/g' "$CONFIG_FILE"
+          sed -i 's/size:\t0x760000,/size:\t0x730000,/g' "$CONFIG_FILE"
+
+          # 2. Xóa TPLINK_HWID để Makefile chạy nhánh tạo file .trx chuẩn
           find configs/boards -name "board.mk" -exec sed -i '/TPLINK_HWID/d' {} +
 
           set -o pipefail
           ./build_firmware.sh 2>&1 | tee build.log
           echo "::endgroup::"
+
 
       - name: Smart-Pack & Debug Collection
         run: |
