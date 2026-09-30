@@ -930,8 +930,10 @@ jobs:
           
           ./clear_tree.sh > /dev/null 2>&1
           rm -rf tmp staging
+          # 1. Ép phân vùng Firmware của Padavan dịch từ 0x20000 lên 0x50000 (khớp 100% với Breed 公版)
+          find configs/boards -name "partitions.config" -exec sed -i 's/0x00020000/0x00050000/g' {} +
 
-          # Xóa định danh TP-Link để ép Makefile build thẳng ra file .trx chuẩn cho Breed
+          # 2. Xóa TPLINK_HWID để ép Makefile build thẳng ra file .trx chuẩn
           find configs/boards -name "board.mk" -exec sed -i '/TPLINK_HWID/d' {} +
 
           set -o pipefail
